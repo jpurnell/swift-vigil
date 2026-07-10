@@ -1,0 +1,33 @@
+{
+  "originHash" : "a2fa95e3d8a4bfe9d3571edbaf5cb20a526c6692037d7078a435fd31be4d1b71",
+  "pins" : [
+    {
+      "identity" : "quality-gate-types",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpurnell/quality-gate-types.git",
+      "state" : {
+        "revision" : "5d0eb911627e264c9d7631c19c041a38fef82349",
+        "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "0687f71944021d616d34d922343dcef086855920",
+        "version" : "600.0.1"
+      }
+    }
+  ],
+  "version" : 3
+}
