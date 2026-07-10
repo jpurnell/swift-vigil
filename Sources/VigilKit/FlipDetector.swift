@@ -59,6 +59,28 @@ public struct TestOutcomeFlip: Sendable, Equatable {
     public let previousCommit: String
     /// Commit of the current run.
     public let currentCommit: String
+
+    /// Creates a flip record.
+    ///
+    /// Constructible publicly so downstream consumers (the quality gate's
+    /// diagnostics tests, tooling) can build fixtures — inside the original
+    /// monolith this leaned on `@testable` visibility, which does not
+    /// survive extraction.
+    public init(
+        suite: String,
+        test: String,
+        previouslyPassed: Bool,
+        nowPassed: Bool,
+        previousCommit: String,
+        currentCommit: String
+    ) {
+        self.suite = suite
+        self.test = test
+        self.previouslyPassed = previouslyPassed
+        self.nowPassed = nowPassed
+        self.previousCommit = previousCommit
+        self.currentCommit = currentCommit
+    }
 }
 
 /// Detects tests whose outcome flipped between two runs with an identical package
