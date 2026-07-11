@@ -14,8 +14,8 @@ struct Vigil: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "vigil",
         abstract: "Flakiness & concurrency auditing for Swift — temporal determinism, cancellation checkpoints, flip detection, stress analysis.",
-        version: "0.5.0",
-        subcommands: [Scan.self, Contract.self, Check.self]
+        version: "0.6.0",
+        subcommands: [Scan.self, Watch.self, Stress.self, Contract.self, Check.self]
     )
 }
 
