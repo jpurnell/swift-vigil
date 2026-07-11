@@ -49,6 +49,44 @@ public enum CancellationScan {
         visitor.walk(tree)
         return Findings(diagnostics: visitor.diagnostics, overrides: visitor.overrides)
     }
+
+    /// Scans every `.swift` file under `directories` (relative to `root`).
+    /// Unreadable files are skipped and reported — a scan never throws.
+    ///
+    /// - Parameters:
+    ///   - root: Project root.
+    ///   - directories: Subdirectories to walk (default `Sources` + `Tests`).
+    ///   - strict: Emit `.error` instead of `.warning`.
+    /// - Returns: Combined findings plus any unreadable file paths.
+    public static func scanDirectories(
+        root: String,
+        directories: [String] = ["Sources", "Tests"],
+        strict: Bool = false
+    ) -> (findings: Findings, skippedFiles: [String]) {
+        let fileManager = FileManager.default
+        var diagnostics: [Diagnostic] = []
+        var overrides: [DiagnosticOverride] = []
+        var skipped: [String] = []
+
+        for dir in directories {
+            let path = (root as NSString).appendingPathComponent(dir)
+            guard fileManager.fileExists(atPath: path) else { continue } // SAFETY: read-only walk of the analyzed project
+            guard let enumerator = fileManager.enumerator(atPath: path) else { continue }
+            while let relativePath = enumerator.nextObject() as? String {
+                guard relativePath.hasSuffix(".swift") else { continue }
+                let fullPath = (path as NSString).appendingPathComponent(relativePath)
+                do {
+                    let source = try String(contentsOfFile: fullPath, encoding: .utf8)
+                    let findings = scanSource(source, fileName: fullPath, strict: strict)
+                    diagnostics.append(contentsOf: findings.diagnostics)
+                    overrides.append(contentsOf: findings.overrides)
+                } catch {
+                    skipped.append(fullPath)
+                }
+            }
+        }
+        return (Findings(diagnostics: diagnostics, overrides: overrides), skipped)
+    }
 }
 
 /// The single-rule visitor behind ``CancellationScan``.

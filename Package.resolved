@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/quality-gate-types.git",
       "state" : {
-        "revision" : "5d0eb911627e264c9d7631c19c041a38fef82349",
-        "version" : "1.1.1"
+        "revision" : "169ea0f44bb34a3702715f042638f935c659910f",
+        "version" : "1.2.0"
       }
     },
     {
