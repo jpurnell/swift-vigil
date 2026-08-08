@@ -43,7 +43,7 @@ public enum CancellationScan {
         let visitor = CancellationCheckpointVisitor(
             fileName: fileName,
             converter: converter,
-            sourceLines: source.components(separatedBy: "\n"),
+            sourceLines: source.lines,
             strict: strict
         )
         visitor.walk(tree)

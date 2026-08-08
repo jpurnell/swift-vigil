@@ -43,7 +43,7 @@ public enum TemporalScan {
         fileName: String,
         config: TemporalDeterminismConfig = .default
     ) -> Findings {
-        let sourceLines = source.components(separatedBy: "\n")
+        let sourceLines = source.lines
         let tree = Parser.parse(source: source)
         let converter = SourceLocationConverter(fileName: fileName, tree: tree)
         let visitor = TemporalVisitor(
