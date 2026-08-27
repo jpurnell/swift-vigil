@@ -1,0 +1,15 @@
+# vigil's own gate configuration.
+
+logging:
+  # vigil is an executable whose stdout *is* its interface: `vigil scan` prints
+  # diagnostics for a human, and the JSON verbs print a document meant to be
+  # piped into something else. Routing that through os.Logger would send the
+  # tool's output to the unified log and leave the pipe empty — the rule's
+  # advice is correct for a library or an app, and wrong here.
+  #
+  # This is a classification, not a suppression: `projectType` is the switch the
+  # LoggingAuditor provides for exactly this case (`if !isCLI` at the print and
+  # missing-import rules), and quality-gate-swift — a CLI by the same author —
+  # declares the same thing. The catch-block and silent-try rules are NOT gated
+  # by it and still apply; they were fixed in code rather than declared away.
+  projectType: cli

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(os)
+import os
+#endif
 import QualityGateTypes
 import SwiftSyntax
 import SwiftParser
@@ -17,6 +20,8 @@ import SwiftParser
 /// Escape hatch: `// concurrency:exempt` on the loop line or the line
 /// above — recorded as an override, never silent.
 public enum CancellationScan {
+    private static let logger = Logger(subsystem: "com.swift-vigil", category: "CancellationScan")
+
 
     /// One scan's findings.
     public struct Findings: Sendable {
@@ -81,6 +86,10 @@ public enum CancellationScan {
                     diagnostics.append(contentsOf: findings.diagnostics)
                     overrides.append(contentsOf: findings.overrides)
                 } catch {
+                    // Recorded *and* logged: the returned list says which files were
+                    // skipped, never why. A permissions problem and a non-UTF-8 file
+                    // are the same entry, and the difference is the whole diagnosis.
+                    logger.warning("Skipping \(fullPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     skipped.append(fullPath)
                 }
             }

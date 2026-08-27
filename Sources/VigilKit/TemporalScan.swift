@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(os)
+import os
+#endif
 import QualityGateTypes
 import SwiftSyntax
 import SwiftParser
@@ -22,6 +25,8 @@ import SwiftParser
 /// performance test (exempts the assertion rule — and enrolls the test in
 /// vigil's stress runs).
 public enum TemporalScan {
+    private static let logger = Logger(subsystem: "com.swift-vigil", category: "TemporalScan")
+
 
     /// One scan's findings: diagnostics plus the recorded exemptions.
     public struct Findings: Sendable {
@@ -91,6 +96,10 @@ public enum TemporalScan {
                     diagnostics.append(contentsOf: findings.diagnostics)
                     overrides.append(contentsOf: findings.overrides)
                 } catch {
+                    // See CancellationScan: the skipped list records that a file was
+                    // dropped, not why. Log the reason so an unreadable file is
+                    // distinguishable from an undecodable one.
+                    logger.warning("Skipping \(fullPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     skipped.append(fullPath)
                 }
             }

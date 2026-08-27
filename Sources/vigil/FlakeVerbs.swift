@@ -1,11 +1,16 @@
 import ArgumentParser
 import Foundation
+#if canImport(os)
+import os
+#endif
 import VigilKit
 
 /// Shared spawning for the flake verbs: runs `swift test` in a project and
 /// returns its combined output. Orchestration lives here in the CLI —
 /// VigilKit stays pure detection.
 enum TestSpawner {
+    private static let logger = Logger(subsystem: "com.swift-vigil", category: "TestSpawner")
+
     /// The result of one `swift test` invocation.
     struct RunOutput {
         /// Combined stdout+stderr.
@@ -50,6 +55,11 @@ enum TestSpawner {
         do {
             try process.run()
         } catch {
+            // Logged rather than printed: this helper is called by the JSON verbs,
+            // and anything written to stdout from here lands in the middle of the
+            // document they emit. The empty return is the documented fallback, but a
+            // silent one turns every flip record's commit into "" with no trace.
+            logger.warning("git rev-parse failed in \(root, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return ""
         }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
