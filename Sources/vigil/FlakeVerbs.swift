@@ -4,6 +4,7 @@ import Foundation
 import os
 #endif
 import VigilKit
+import ProcessKernel
 
 /// Shared spawning for the flake verbs: runs `swift test` in a project and
 /// returns its combined output. Orchestration lives here in the CLI —
@@ -19,41 +20,52 @@ enum TestSpawner {
         let succeeded: Bool
     }
 
+    /// How long a single `swift test` run may take before it is killed.
+    ///
+    /// Generous, because a real suite on a cold build is slow and a deadline that
+    /// fires on healthy work is worse than none. Finite, because `vigil stress`
+    /// runs a suite repeatedly under deliberate contention — the exact conditions
+    /// under which a test deadlocks — and an unbounded wait there means the tool
+    /// built to find hangs hangs instead of reporting one.
+    static let testTimeout: TimeInterval = 1_800
+
     /// Runs `swift test` (optionally filtered) in `root`.
+    ///
+    /// Spawned through ``ProcessRunner``, which drains both pipes concurrently and
+    /// enforces the deadline by signalling the child's process *group* — SwiftPM
+    /// leaves build servers and test helpers behind, and terminating only the
+    /// direct child leaves them holding the pipe open.
     static func swiftTest(root: String, filter: String? = nil) throws -> RunOutput {
-        let process = Process() // SAFETY: hardcoded /usr/bin/env swift test
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         var arguments = ["swift", "test"]
         if let filter {
             arguments += ["--filter", filter]
         }
-        process.arguments = arguments
-        process.currentDirectoryURL = URL(fileURLWithPath: root)
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        try process.run()
-        // Drain before waiting — the 64 KB pipe rule.
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return RunOutput(
-            output: String(decoding: data, as: UTF8.self),
-            succeeded: process.terminationStatus == 0)
+        let result = try ProcessRunner.run(
+            "/usr/bin/env", // SAFETY: hardcoded /usr/bin/env swift test
+            arguments: arguments,
+            currentDirectory: root,
+            mergeStderr: true,
+            timeout: testTimeout
+        )
+        if result.exitCode == 124 {
+            logger.warning("swift test in \(root, privacy: .public) exceeded \(Int(testTimeout), privacy: .public)s and was terminated")
+        }
+        return RunOutput(output: result.stdout, succeeded: result.exitCode == 0)
     }
 
     /// Best-effort short commit hash for run records.
     static func currentCommit(root: String) -> String {
-        let process = Process() // SAFETY: hardcoded git invocation
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["rev-parse", "--short", "HEAD"]
-        process.currentDirectoryURL = URL(fileURLWithPath: root)
-        process.environment = ProcessInfo.processInfo.environment
-            .filter { !$0.key.hasPrefix("GIT_") }
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
         do {
-            try process.run()
+            let result = try ProcessRunner.run(
+                "/usr/bin/git", // SAFETY: hardcoded git invocation
+                arguments: ["rev-parse", "--short", "HEAD"],
+                currentDirectory: root,
+                environment: ProcessInfo.processInfo.environment
+                    .filter { !$0.key.hasPrefix("GIT_") },
+                timeout: 30
+            )
+            guard result.exitCode == 0 else { return "" }
+            return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
             // Logged rather than printed: this helper is called by the JSON verbs,
             // and anything written to stdout from here lands in the middle of the
@@ -62,10 +74,6 @@ enum TestSpawner {
             logger.warning("git rev-parse failed in \(root, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return ""
         }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return "" }
-        return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

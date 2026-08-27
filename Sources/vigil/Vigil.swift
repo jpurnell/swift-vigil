@@ -93,6 +93,11 @@ struct Check: ParsableCommand {
 
     func run() throws {
         let startTime = ContinuousClock.now
+        // No kernel applies here: there is no child process to bound, only our own
+        // inherited descriptor. EOF is the only message boundary the plugin contract
+        // defines, so a host that opens the pipe and never closes it parks this process
+        // — and nothing on this side can tell that apart from a slow write.
+        // Unbounded: EOF on our own stdin is the plugin protocol's message framing; the host closes it, and no child exists to bound.
         let input = FileHandle.standardInput.readDataToEndOfFile()
         let request = try JSONDecoder().decode(PluginCheckRequest.self, from: input)
 

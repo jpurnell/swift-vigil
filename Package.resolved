@@ -1,5 +1,5 @@
 {
-  "originHash" : "9871ab60739f707e3aa390fcd7cfb303b713cdb939af743949e27a5d3059973d",
+  "originHash" : "d4892967d6f5aea8a2c11decb4110a86cb4e59f586dfaf7afa93aff43374d9ab",
   "pins" : [
     {
       "identity" : "quality-gate-types",
@@ -35,6 +35,15 @@
       "state" : {
         "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
         "version" : "3.15.1"
+      }
+    },
+    {
+      "identity" : "swift-process-kernel",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpurnell/swift-process-kernel.git",
+      "state" : {
+        "revision" : "5124b9ad6d995274ff11833247f7892b239aee00",
+        "version" : "1.0.0"
       }
     },
     {
