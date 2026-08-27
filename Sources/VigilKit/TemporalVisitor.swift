@@ -25,6 +25,32 @@ private let simulationTypeMarkers: [String] = [
     "simulation", "simulated", "synthetic", "mock", "fake", "stub", "replay", "fixture"
 ]
 
+/// Argument labels that name a timestamp outright (compared lowercased).
+///
+/// Exact matches only. An earlier version tested `contains("time")` and
+/// `hasSuffix("at")`, which caught `timeout:`, `timeGrid:`, `format:` and
+/// `heartbeat:` while missing `asOf:` — the commonest spelling for a
+/// business-time stamp.
+private let timestampLabelExact: Set<String> = [
+    "at", "when", "time", "date", "timestamp", "instant", "moment",
+    "asof", "ason", "effective", "occurred", "observed", "recorded"
+]
+
+/// Trailing camelCase components that name a timestamp (`executedAt`,
+/// `valuationDate`, `startTime`). Matched against the final component only, so
+/// `format` and `heartbeat` — single components — do not qualify.
+/// `on` is deliberately absent: it would catch `basedOn`, `dependsOn` and
+/// `turnedOn`, which is the same over-matching this list exists to end. A
+/// domain that really does say `bookedOn` declares it via `timestampLabels`.
+private let timestampLabelSuffixes: Set<String> = [
+    "at", "time", "date", "timestamp", "instant", "moment", "stamp"
+]
+
+/// Methods whose closure argument is evaluated once per element.
+private let repeatedEvaluationMethods: Set<String> = [
+    "map", "forEach", "flatMap", "compactMap", "filter", "reduce"
+]
+
 /// Relational operators used in timing threshold assertions.
 private let relationalOperators: Set<String> = ["<", ">", "<=", ">="]
 
@@ -42,7 +68,11 @@ private let booleanXCTAsserts: Set<String> = ["XCTAssert", "XCTAssertTrue", "XCT
 /// Walks a Swift syntax tree detecting wall-clock nondeterminism.
 ///
 /// - **temporal-simulated-wall-clock**: a wall-clock read used as a timestamp
-///   value inside a simulation/synthetic/mock type.
+///   value inside a simulation/synthetic/mock type. Both halves are name
+///   matches — the enclosing type against ``simulationTypeMarkers`` (plus any
+///   `config.simulationTypes`), and the argument label against the timestamp
+///   vocabulary. Neither is semantic, so a determinism-critical type named
+///   something else is not covered by this rule.
 /// - **temporal-wall-clock-assertion**: a test assertion comparing measured
 ///   elapsed wall-clock time against a numeric threshold.
 final class TemporalVisitor: SyntaxVisitor {
@@ -117,11 +147,12 @@ final class TemporalVisitor: SyntaxVisitor {
 
     private func pushType(name: String, inheritance: InheritanceClauseSyntax?) {
         let lowerName = name.lowercased()
-        var isSim = simulationTypeMarkers.contains { lowerName.contains($0) }
+        let markers = simulationTypeMarkers + config.simulationTypes.map { $0.lowercased() }
+        var isSim = markers.contains { lowerName.contains($0) }
         if let inheritance {
             for inherited in inheritance.inheritedTypes {
                 let lower = inherited.type.trimmedDescription.lowercased()
-                if simulationTypeMarkers.contains(where: { lower.contains($0) }) { isSim = true }
+                if markers.contains(where: { lower.contains($0) }) { isSim = true }
             }
         }
         if config.exemptTypes.contains(where: { name.contains($0) }) { isSim = false }
@@ -163,7 +194,7 @@ final class TemporalVisitor: SyntaxVisitor {
                 if wallClockRead(arg.expression) {
                     emit(
                         ruleId: "temporal-simulated-wall-clock",
-                        message: "Simulated source stamps wall-clock time into `\(label):`; sample spacing will track scheduler jitter, not the intended interval.",
+                        message: Self.simulatedStampMessage(label: label, repeated: isInRepetition(Syntax(arg.expression))),
                         node: Syntax(arg.expression),
                         isAssertion: false,
                         suggestedFix: "Derive the timestamp from a fixed logical origin advanced by elapsed synthetic time"
@@ -363,12 +394,70 @@ final class TemporalVisitor: SyntaxVisitor {
         return false
     }
 
+    // MARK: - Message shaping
+
+    /// The harm to report, which depends on whether the stamp repeats.
+    ///
+    /// A stamp inside a loop produces a *series* of timestamps, and there the
+    /// spacing between them is the thing that decays into scheduler jitter. A
+    /// single stamp has no spacing to distort; its harm is that the value —
+    /// and anything derived from it — differs on every run. Reporting the
+    /// spacing claim for a single stamp describes a mechanism that is not
+    /// present, which invites the reader to dismiss the finding.
+    static func simulatedStampMessage(label: String, repeated: Bool) -> String {
+        if repeated {
+            return "Simulated source stamps wall-clock time into `\(label):` inside a loop; sample spacing will track scheduler jitter, not the intended interval."
+        }
+        return "Simulated source stamps wall-clock time into `\(label):`; the value is not reproducible, so identical inputs produce a different result on every run."
+    }
+
+    /// True when the node sits inside a loop or a repeated-evaluation closure.
+    private func isInRepetition(_ node: Syntax) -> Bool {
+        var current: Syntax? = node.parent
+        while let candidate = current {
+            if candidate.is(ForStmtSyntax.self)
+                || candidate.is(WhileStmtSyntax.self)
+                || candidate.is(RepeatStmtSyntax.self) {
+                return true
+            }
+            if let call = candidate.as(FunctionCallExprSyntax.self),
+               let member = call.calledExpression.as(MemberAccessExprSyntax.self),
+               repeatedEvaluationMethods.contains(member.declName.baseName.text) {
+                return true
+            }
+            current = candidate.parent
+        }
+        return false
+    }
+
     // MARK: - Name helpers
 
     private func isTimestampLabel(_ label: String) -> Bool {
-        let l = label.lowercased()
-        return l.contains("time") || l.contains("date") || l == "at" || l.hasSuffix("at")
-            || l == "when" || l == "instant" || l == "moment"
+        let lower = label.lowercased()
+        if timestampLabelExact.contains(lower) { return true }
+        if config.timestampLabels.contains(where: { $0.lowercased() == lower }) { return true }
+        guard let last = Self.camelCaseComponents(label).last else { return false }
+        return timestampLabelSuffixes.contains(last)
+    }
+
+    /// Splits an identifier into lowercased camelCase components.
+    ///
+    /// `executedAt` → `["executed", "at"]`; `format` → `["format"]`. Only a
+    /// genuine case boundary starts a new component, which is what separates
+    /// `executedAt` from `format` — both end in the letters "at".
+    static func camelCaseComponents(_ identifier: String) -> [String] {
+        var components: [String] = []
+        var current = ""
+        for character in identifier {
+            if character.isUppercase, !current.isEmpty {
+                components.append(current.lowercased())
+                current = String(character)
+            } else {
+                current.append(character)
+            }
+        }
+        if !current.isEmpty { components.append(current.lowercased()) }
+        return components
     }
 
     private func isTimestampTargetName(_ expr: ExprSyntax) -> Bool {

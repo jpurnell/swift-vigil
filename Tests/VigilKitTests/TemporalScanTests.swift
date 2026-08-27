@@ -18,7 +18,7 @@ private func diagnose(
     let visitor = TemporalVisitor(
         filePath: filePath,
         converter: converter,
-        sourceLines: source.components(separatedBy: "\n"),
+        sourceLines: source.lines,
         config: config
     )
     visitor.walk(tree)
@@ -36,7 +36,7 @@ private func overridesFor(
     let visitor = TemporalVisitor(
         filePath: filePath,
         converter: converter,
-        sourceLines: source.components(separatedBy: "\n"),
+        sourceLines: source.lines,
         config: config
     )
     visitor.walk(tree)
@@ -227,5 +227,115 @@ struct WallClockAssertionTests {
         """
         #expect(diagnose(code, filePath: testPath).isEmpty)
         #expect(overridesFor(code, filePath: testPath).contains { $0.ruleId == assertRule })
+    }
+}
+
+// MARK: - Rule 1: which argument labels count as a timestamp
+
+@Suite("TemporalDeterminismAuditor: timestamp label matching")
+struct TimestampLabelTests {
+
+    /// Wraps a call in a simulation type so only the label varies.
+    private func inSimType(_ call: String) -> String {
+        """
+        struct SimulationProbe {
+            func make() { _ = Thing(\(call)) }
+        }
+        """
+    }
+
+    @Test("Flags asOf:, the common spelling for a business-time stamp",
+          arguments: ["asOf: Date()", "valuationDate: Date()", "observedAt: Date()",
+                      "recordedAt: Date()", "effective: Date()"])
+    func flagsBusinessTimeLabels(_ call: String) {
+        #expect(diagnose(inSimType(call)).contains { $0.ruleId == simRule })
+    }
+
+    @Test("Does not flag labels that merely contain 'time' or end in 'at'",
+          arguments: ["format: Date()", "heartbeat: Date()", "timeout: Date()",
+                      "timeGrid: Date()", "flat: Date()", "repeatCount: Date()"])
+    func ignoresIncidentalLabels(_ call: String) {
+        #expect(diagnose(inSimType(call)).isEmpty)
+    }
+
+    @Test("Still flags the established labels",
+          arguments: ["at: Date()", "time: Date()", "date: Date()", "timestamp: Date()",
+                      "executedAt: Date()", "startTime: Date()", "createdDate: Date()",
+                      "when: Date()", "instant: Date()", "moment: Date()"])
+    func flagsEstablishedLabels(_ call: String) {
+        #expect(diagnose(inSimType(call)).contains { $0.ruleId == simRule })
+    }
+
+    @Test("config.timestampLabels adds a project's own spelling")
+    func honorsConfiguredLabels() {
+        let code = inSimType("bookedOn: Date()")
+        #expect(diagnose(code).isEmpty)
+        let cfg = TemporalDeterminismConfig(timestampLabels: ["bookedOn"])
+        #expect(diagnose(code, config: cfg).contains { $0.ruleId == simRule })
+    }
+}
+
+// MARK: - Rule 1: which types count as simulated
+
+@Suite("TemporalDeterminismAuditor: simulation type matching")
+struct SimulationTypeTests {
+
+    @Test("config.simulationTypes declares a project's own simulated sources")
+    func honorsConfiguredTypes() {
+        let code = """
+        struct PriceFeedDouble {
+            func emit() { _ = Sample(timestamp: Date()) }
+        }
+        """
+        #expect(diagnose(code).isEmpty)
+        let cfg = TemporalDeterminismConfig(simulationTypes: ["FeedDouble"])
+        #expect(diagnose(code, config: cfg).contains { $0.ruleId == simRule })
+    }
+
+    @Test("A configured type name still loses to exemptTypes")
+    func exemptTypesWinsOverConfigured() {
+        let code = """
+        struct PriceFeedDouble {
+            func emit() { _ = Sample(timestamp: Date()) }
+        }
+        """
+        let cfg = TemporalDeterminismConfig(
+            exemptTypes: ["PriceFeedDouble"],
+            simulationTypes: ["FeedDouble"]
+        )
+        #expect(diagnose(code, config: cfg).isEmpty)
+    }
+}
+
+// MARK: - Rule 1: the message must describe the harm that is actually present
+
+@Suite("TemporalDeterminismAuditor: diagnostic message accuracy")
+struct MessageAccuracyTests {
+
+    @Test("A stamp inside a loop is reported as sample-spacing jitter")
+    func loopStampMentionsSpacing() {
+        let code = """
+        struct SimulationFeed {
+            func run() {
+                for _ in 0..<10 {
+                    emit(Sample(timestamp: Date()))
+                }
+            }
+        }
+        """
+        let message = diagnose(code).first { $0.ruleId == simRule }?.message ?? ""
+        #expect(message.contains("spacing"))
+    }
+
+    @Test("A single stamp is reported as non-reproducibility, not as spacing")
+    func singleStampMentionsReproducibility() {
+        let code = """
+        struct SimulationRun {
+            func finish() -> Metadata { Metadata(seed: seed, timestamp: Date()) }
+        }
+        """
+        let message = diagnose(code).first { $0.ruleId == simRule }?.message ?? ""
+        #expect(message.contains("reproducib"))
+        #expect(!message.contains("spacing"))
     }
 }

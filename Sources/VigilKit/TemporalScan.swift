@@ -9,9 +9,11 @@ import SwiftParser
 /// Rules:
 /// - `temporal-simulated-wall-clock` — a simulation/synthetic/mock type
 ///   stamps a wall-clock read (`ContinuousClock.now`, `Date()`, …) as a
-///   timestamp value. Simulated data must derive time from a logical origin,
-///   or its output spacing tracks scheduler jitter instead of the intended
-///   interval.
+///   timestamp value. Simulated data must derive time from a logical origin.
+///   Inside a loop the damage is spacing — successive samples end up separated
+///   by scheduler jitter rather than the intended interval; for a single stamp
+///   it is reproducibility, the same inputs yielding a different value each
+///   run. The emitted message distinguishes the two.
 /// - `temporal-wall-clock-assertion` — a test asserts on *measured elapsed
 ///   wall-clock time* against a numeric threshold, which flakes under load.
 ///

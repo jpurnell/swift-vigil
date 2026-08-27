@@ -25,6 +25,21 @@ public struct TemporalDeterminismConfig: Sendable, Equatable {
     /// File path substrings exempt from all temporal checks.
     public var exemptFiles: [String]
 
+    /// Additional type-name substrings that mark a type as a simulated source.
+    ///
+    /// The built-in markers (`simulation`, `mock`, `fake`, `stub`, …) are name
+    /// conventions, and a project whose fabricated sources are named by some
+    /// other convention is invisible to this rule. Entries here are added to
+    /// those markers, matched the same way. `exemptTypes` still wins.
+    public var simulationTypes: [String]
+
+    /// Additional argument labels that count as stamping a timestamp.
+    ///
+    /// The built-in labels cover the common spellings (`timestamp`, `at`,
+    /// `asOf`, `observedAt`, …). A domain with its own vocabulary — `bookedOn`,
+    /// `postedOn` — declares it here rather than going unchecked.
+    public var timestampLabels: [String]
+
     /// Whether to flag wall-clock reads stamped as timestamps inside
     /// simulation/synthetic/mock types (`temporal-simulated-wall-clock`).
     public var flagSimulatedWallClock: Bool
@@ -38,12 +53,16 @@ public struct TemporalDeterminismConfig: Sendable, Equatable {
         exemptTypes: [String] = [],
         exemptFunctions: [String] = [],
         exemptFiles: [String] = [],
+        simulationTypes: [String] = [],
+        timestampLabels: [String] = [],
         flagSimulatedWallClock: Bool = true,
         flagWallClockAssertion: Bool = true
     ) {
         self.exemptTypes = exemptTypes
         self.exemptFunctions = exemptFunctions
         self.exemptFiles = exemptFiles
+        self.simulationTypes = simulationTypes
+        self.timestampLabels = timestampLabels
         self.flagSimulatedWallClock = flagSimulatedWallClock
         self.flagWallClockAssertion = flagWallClockAssertion
     }
@@ -54,7 +73,8 @@ public struct TemporalDeterminismConfig: Sendable, Equatable {
 
 extension TemporalDeterminismConfig: Codable {
     private enum CodingKeys: String, CodingKey {
-        case exemptTypes, exemptFunctions, exemptFiles, flagSimulatedWallClock, flagWallClockAssertion
+        case exemptTypes, exemptFunctions, exemptFiles, simulationTypes, timestampLabels
+        case flagSimulatedWallClock, flagWallClockAssertion
     }
 
     /// Creates a temporal determinism configuration by decoding from the given decoder.
@@ -64,6 +84,8 @@ extension TemporalDeterminismConfig: Codable {
         exemptTypes = try container.decodeIfPresent([String].self, forKey: .exemptTypes) ?? defaults.exemptTypes
         exemptFunctions = try container.decodeIfPresent([String].self, forKey: .exemptFunctions) ?? defaults.exemptFunctions
         exemptFiles = try container.decodeIfPresent([String].self, forKey: .exemptFiles) ?? defaults.exemptFiles
+        simulationTypes = try container.decodeIfPresent([String].self, forKey: .simulationTypes) ?? defaults.simulationTypes
+        timestampLabels = try container.decodeIfPresent([String].self, forKey: .timestampLabels) ?? defaults.timestampLabels
         flagSimulatedWallClock = try container.decodeIfPresent(Bool.self, forKey: .flagSimulatedWallClock) ?? defaults.flagSimulatedWallClock
         flagWallClockAssertion = try container.decodeIfPresent(Bool.self, forKey: .flagWallClockAssertion) ?? defaults.flagWallClockAssertion
     }
