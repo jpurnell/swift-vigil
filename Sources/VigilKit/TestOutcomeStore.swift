@@ -2,7 +2,8 @@ import Foundation
 
 /// On-disk store of the most recent test roster per package key.
 ///
-/// Mirrors ``ResultCache``'s safety posture: best-effort and corruption-safe — an
+/// Mirrors `ResultCache`'s safety posture — that type lives in quality-gate-swift and is not
+/// linkable from here: best-effort and corruption-safe, in that an
 /// unreadable or malformed entry is treated as "no prior data" (never a crash), and a
 /// write failure never fails the gate. The stored record lets the flip detector compare
 /// the current run against the last one (see ``FlipDetector``).

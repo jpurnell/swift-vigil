@@ -40,7 +40,7 @@ struct TestOutcomeStoreTests {
         let store = TestOutcomeStore(directory: dir)
         store.storeLatest(record(), key: "pkg")
         // Corrupt the on-disk entry.
-        let entry = try #require(store.entryURLForTesting(key: "pkg"))
+        let entry = store.entryURLForTesting(key: "pkg")
         try Data("not json".utf8).write(to: entry)
         #expect(store.loadLatest(key: "pkg") == nil)
     }
