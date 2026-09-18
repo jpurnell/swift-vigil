@@ -48,6 +48,14 @@ public struct TemporalDeterminismConfig: Sendable, Equatable {
     /// (`temporal-wall-clock-assertion`).
     public var flagWallClockAssertion: Bool
 
+    /// Whether to flag an ambient calendar read in production code.
+    ///
+    /// `Calendar.current` takes the calendar system, locale and time zone of whatever machine is
+    /// running, so any component it computes moves with the deployment. `Calendar(identifier:)`
+    /// is included because it *looks* fixed: it pins the calendar system and still inherits
+    /// `TimeZone.current`, which is the half that reads as diligence.
+    public var flagAmbientCalendar: Bool
+
     /// Creates a temporal determinism configuration with the given options.
     public init(
         exemptTypes: [String] = [],
@@ -56,7 +64,8 @@ public struct TemporalDeterminismConfig: Sendable, Equatable {
         simulationTypes: [String] = [],
         timestampLabels: [String] = [],
         flagSimulatedWallClock: Bool = true,
-        flagWallClockAssertion: Bool = true
+        flagWallClockAssertion: Bool = true,
+        flagAmbientCalendar: Bool = true
     ) {
         self.exemptTypes = exemptTypes
         self.exemptFunctions = exemptFunctions
@@ -65,6 +74,7 @@ public struct TemporalDeterminismConfig: Sendable, Equatable {
         self.timestampLabels = timestampLabels
         self.flagSimulatedWallClock = flagSimulatedWallClock
         self.flagWallClockAssertion = flagWallClockAssertion
+        self.flagAmbientCalendar = flagAmbientCalendar
     }
 
     /// Default temporal determinism configuration.
@@ -74,7 +84,7 @@ public struct TemporalDeterminismConfig: Sendable, Equatable {
 extension TemporalDeterminismConfig: Codable {
     private enum CodingKeys: String, CodingKey {
         case exemptTypes, exemptFunctions, exemptFiles, simulationTypes, timestampLabels
-        case flagSimulatedWallClock, flagWallClockAssertion
+        case flagSimulatedWallClock, flagWallClockAssertion, flagAmbientCalendar
     }
 
     /// Creates a temporal determinism configuration by decoding from the given decoder.
@@ -88,6 +98,7 @@ extension TemporalDeterminismConfig: Codable {
         timestampLabels = try container.decodeIfPresent([String].self, forKey: .timestampLabels) ?? defaults.timestampLabels
         flagSimulatedWallClock = try container.decodeIfPresent(Bool.self, forKey: .flagSimulatedWallClock) ?? defaults.flagSimulatedWallClock
         flagWallClockAssertion = try container.decodeIfPresent(Bool.self, forKey: .flagWallClockAssertion) ?? defaults.flagWallClockAssertion
+        flagAmbientCalendar = try container.decodeIfPresent(Bool.self, forKey: .flagAmbientCalendar) ?? defaults.flagAmbientCalendar
     }
 }
 

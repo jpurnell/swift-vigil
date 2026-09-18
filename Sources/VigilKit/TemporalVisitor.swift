@@ -115,6 +115,34 @@ final class TemporalVisitor: SyntaxVisitor {
 
     // MARK: - Type tracking
 
+    // MARK: - temporal-ambient-calendar
+
+    /// Production code reading the machine's calendar.
+    ///
+    /// Scoped to files outside `Tests/`. A test's ambient calendar is its own rule's business —
+    /// `test-quality`'s `ambient-calendar-in-test` owns that, and reporting the same line twice
+    /// would make one of the two wrong. This rule exists because that one **cannot see
+    /// production**: three of the four defects that motivated it were found through a test
+    /// mirroring a production call the scanner never reached.
+    override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+        guard config.flagAmbientCalendar, !isTestFile else { return .visitChildren }
+        guard let reading = AmbientCalendarRule.reading(at: node) else { return .visitChildren }
+
+        emit(
+            ruleId: "temporal-ambient-calendar",
+            message: reading.message,
+            node: Syntax(node),
+            isAssertion: false,
+            suggestedFix: "Use a calendar with an explicit timeZone — `Calendar.gregorianUTC` from SwiftDeterminism is one — so the result does not depend on where this runs. Pin the parser too if a date comes from a string: pinning the calendar alone still shifts the day west of UTC."
+        )
+        return .visitChildren
+    }
+
+    /// Whether this file is a test file, by path.
+    ///
+    /// The same test `TemporalScan` uses to choose between its two existing rules.
+    private var isTestFile: Bool { filePath.contains("/Tests/") }
+
     override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
         pushType(name: node.name.text, inheritance: node.inheritanceClause)
         return .visitChildren

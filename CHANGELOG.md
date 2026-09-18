@@ -4,6 +4,33 @@ All notable changes to swift-vigil are documented here.
 
 ## [Unreleased]
 
+### Added
+- **`temporal-ambient-calendar`** — production code whose date arithmetic moves with the machine.
+  The existing rules here are about the *clock*; this is the *calendar*, which fails the same way
+  and hides better: a wall-clock read looks like one, while `Calendar.current` looks like the
+  obvious way to get a calendar.
+
+  Flags `Calendar.current`, and `Calendar(identifier:)` with no time zone pinned. The second
+  matters more — pinning the identifier reads as diligence, so the site survives review, while
+  the value still carries `TimeZone.current`.
+
+  Four defects in one week motivated it, each written by someone who knew about time zones: an
+  application's ranking differed by deployment zone; "years of experience" could land a month
+  either side; a January date rendered as the previous year; a simulation's period boundaries
+  landed one step early west of Greenwich. **Three of the four were found through a *test* that
+  mirrored the production call**, by a rule scanning only `Tests/` that structurally could not
+  reach the original. This one looks where the defect is.
+
+  Three carve-outs, all earned rather than imagined — a zone pinned by a later statement, pinned
+  inside an `if let` (those initialisers are failable), or pinned as a sibling argument of the
+  same call. That last is the *safest* form, and an earlier version of these carve-outs elsewhere
+  missed it and reported eleven findings against exemplary code. `Calendar.current` gets none of
+  them: pinning a zone fixes half an ambient calendar, and the system is still the runner's.
+
+  Scoped to files outside `Tests/`, so it does not double-report what `test-quality`'s
+  `ambient-calendar-in-test` already owns. Toggle: `flagAmbientCalendar`. Suppression:
+  `// temporal:exempt`, recorded as an override like every other rule here.
+
 ### Changed
 - Subprocess spawning routes through
   [`swift-process-kernel`](https://github.com/jpurnell/swift-process-kernel) rather
