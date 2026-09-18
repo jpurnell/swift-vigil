@@ -2,6 +2,35 @@
 
 All notable changes to swift-vigil are documented here.
 
+## [0.8.1] — 2026-09-18
+
+### Fixed
+- **`temporal-ambient-calendar` gains a fourth carve-out: a pin that comes *before* the
+  assignment.** 0.8.0 shipped a scan that only looked forward from the statement holding the
+  `Calendar(identifier:)`. That is correct for a fresh binding — `var c = Calendar(…)` cannot be
+  pinned by anything above it, because the value does not exist yet — but wrong the moment the
+  calendar is assigned *into* a receiver that was already there:
+
+  ```swift
+  let formatter = DateFormatter()
+  formatter.dateFormat = "yyyy-MM-dd"
+  formatter.timeZone = TimeZone(identifier: "UTC")     // the pin
+  formatter.locale = Locale(identifier: "en_US_POSIX")
+  formatter.calendar = Calendar(identifier: .gregorian) // 0.8.0 reported this
+  ```
+
+  Nothing is ambient here. The order is not even incidental: `dateFormat`, `timeZone`, `locale`,
+  `calendar` is how the idiom reads, so the pin lands first essentially every time.
+
+  Found by pointing 0.8.0 at the `Sources/` of the repository that consumes it — three of its
+  twelve findings were this shape, against code doing the careful thing. The remaining nine were
+  real.
+
+  The distinction is now explicit rather than accidental: a binding still gets a
+  forward-only scan, a pre-existing receiver gets the whole block. A test pins the other
+  direction too — a receiver with no pin anywhere is still reported, so "assigned into a
+  receiver" did not quietly become the carve-out itself.
+
 ## [0.8.0] — 2026-09-18
 
 ### Added
@@ -125,6 +154,8 @@ All notable changes to swift-vigil are documented here.
   plugin contract v1.
 
 [Unreleased]: https://github.com/jpurnell/swift-vigil/compare/0.7.0...HEAD
+[0.8.1]: https://github.com/jpurnell/swift-vigil/compare/0.8.0...0.8.1
+[0.8.0]: https://github.com/jpurnell/swift-vigil/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/jpurnell/swift-vigil/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/jpurnell/swift-vigil/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/jpurnell/swift-vigil/compare/0.4.0...0.5.0

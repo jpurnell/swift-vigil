@@ -42,6 +42,11 @@ import SwiftSyntax
 ///    `DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: …)`. This is the
 ///    *safest* form, since the value never exists unpinned, and a first version of these
 ///    carve-outs missed it and reported eleven findings against exemplary code.
+/// 4. **An earlier statement, when the calendar is assigned into something that already exists**
+///    — `formatter.timeZone = …` then `formatter.calendar = Calendar(identifier:)`. Carve-out 1
+///    only looks forward, which is right for a fresh `var`: a pin cannot precede the value it
+///    pins. A receiver has no such constraint, and the `DateFormatter` idiom sets the zone first.
+///    Scanning forward only reported three findings against this repository's own `Sources/`.
 ///
 /// `Calendar.current` gets none of them. Pinning a zone fixes half an ambient calendar; the
 /// system is still the runner's, and a Japanese or Buddhist locale returns a different year for
@@ -92,16 +97,21 @@ enum AmbientCalendarRule {
     private static func isPinned(_ call: FunctionCallExprSyntax) -> Bool {
         if pinnedBySiblingArgument(call) { return true }
 
-        guard let name = boundName(of: call),
+        guard let binding = boundName(of: call),
               let item = enclosingStatement(of: call),
               let siblings = item.parent?.as(CodeBlockItemListSyntax.self) else {
             return false
         }
         var reached = false
-        let scan = TimeZonePinScanner(name: name, viewMode: .sourceAccurate)
+        let scan = TimeZonePinScanner(name: binding.name, viewMode: .sourceAccurate)
         for sibling in siblings {
             if sibling.id == item.id { reached = true; continue }
-            guard reached else { continue }
+            // A fresh `var c = Calendar(…)` can only be pinned after it exists, so an earlier
+            // `c.timeZone` is a different `c`. A receiver that was already there — `formatter`
+            // in `formatter.calendar = Calendar(…)` — may have been pinned on either side, and
+            // the DateFormatter idiom pins the zone first. Scanning forward only reported three
+            // findings against code that sets `timeZone`, `locale` and `calendar` in that order.
+            guard reached || binding.receiverPreexists else { continue }
             scan.walk(sibling)
             if scan.found { return true }
         }
@@ -118,12 +128,20 @@ enum AmbientCalendarRule {
         return enclosing.arguments.contains { $0.label?.text == "timeZone" }
     }
 
+    /// The name a pin would have to target, and whether that name predates this statement.
+    private struct Binding {
+        /// The identifier `<name>.timeZone = …` would have to name.
+        let name: String
+        /// True when the calendar is assigned *into* something that already existed.
+        let receiverPreexists: Bool
+    }
+
     /// The name this calendar is bound to, or assigned into.
-    private static func boundName(of call: FunctionCallExprSyntax) -> String? {
+    private static func boundName(of call: FunctionCallExprSyntax) -> Binding? {
         if let initializer = call.parent?.as(InitializerClauseSyntax.self),
            let binding = initializer.parent?.as(PatternBindingSyntax.self),
            let pattern = binding.pattern.as(IdentifierPatternSyntax.self) {
-            return pattern.identifier.text
+            return Binding(name: pattern.identifier.text, receiverPreexists: false)
         }
         guard let sequence = call.parent?.as(ExprListSyntax.self)?
                 .parent?.as(SequenceExprSyntax.self) else { return nil }
@@ -133,7 +151,7 @@ enum AmbientCalendarRule {
               elements.last?.id == ExprSyntax(call).id,
               let member = elements[0].as(MemberAccessExprSyntax.self),
               let base = member.base?.as(DeclReferenceExprSyntax.self) else { return nil }
-        return base.baseName.text
+        return Binding(name: base.baseName.text, receiverPreexists: true)
     }
 
     /// The statement a node belongs to. Terminates at the root.

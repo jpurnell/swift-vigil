@@ -195,6 +195,49 @@ struct AmbientCalendarRuleTests {
         #expect(scan.overrides.contains { $0.ruleId == "temporal-ambient-calendar" })
     }
 
+    @Test("A DateFormatter whose zone was pinned two lines earlier")
+    func ignoresPinBeforeAssignment() {
+        // Three findings in quality-gate-swift's own Sources/ against exactly this shape. The
+        // formatter already exists when the calendar lands on it, so the pin is allowed to come
+        // first — and in the idiom it always does, because `dateFormat`/`timeZone`/`locale` read
+        // naturally in that order.
+        let source = """
+        import Foundation
+
+        enum Today {
+            static func iso() -> String {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                formatter.timeZone = TimeZone(identifier: "UTC")
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.calendar = Calendar(identifier: .gregorian)
+                return formatter.string(from: Date())
+            }
+        }
+        """
+        #expect(findings(source).isEmpty)
+    }
+
+    @Test("Widening the scan is not a blanket pass for member assignment")
+    func flagsUnpinnedReceiver() {
+        // The pin may now come from either side of the assignment — but it still has to exist.
+        // Without this, "assigned into a receiver" would itself become the carve-out.
+        let source = """
+        import Foundation
+
+        enum Today {
+            static func iso() -> String {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.calendar = Calendar(identifier: .gregorian)
+                return formatter.string(from: Date())
+            }
+        }
+        """
+        #expect(findings(source).count == 1)
+    }
+
     @Test("The toggle turns it off")
     func respectsToggle() {
         var config = TemporalDeterminismConfig.default
