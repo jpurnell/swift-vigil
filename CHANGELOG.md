@@ -2,7 +2,7 @@
 
 All notable changes to swift-vigil are documented here.
 
-## [Unreleased]
+## [0.8.0] — 2026-09-18
 
 ### Added
 - **`temporal-ambient-calendar`** — production code whose date arithmetic moves with the machine.
