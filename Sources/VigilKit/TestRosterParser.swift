@@ -1,7 +1,5 @@
 import Foundation
-#if canImport(os)
-import os
-#endif
+import QualityGateLogging
 
 /// Parses the full pass/fail roster from `swift test` output — the roster
 /// the flip detector fingerprints across runs and stress analysis compares
