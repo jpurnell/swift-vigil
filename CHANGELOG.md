@@ -2,6 +2,14 @@
 
 All notable changes to swift-vigil are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- `PackageFingerprint` acknowledges its file reads with a `// SECURITY:` reason. The paths come
+  from enumerating the package's own trees; the next quality gate no longer lets `// SAFETY:`
+  answer a security rule.
+
 ## [0.8.1] — 2026-09-18
 
 ### Fixed
