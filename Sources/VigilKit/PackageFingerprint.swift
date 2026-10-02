@@ -28,6 +28,7 @@ public enum PackageFingerprint {
 
         for relative in files.sorted() {
             let url = rootURL.appendingPathComponent(relative)
+            // SECURITY: each relative path came from enumerating this package's own Sources and Tests trees
             guard let data = FileManager.default.contents(atPath: url.path) else { continue } // SAFETY: unreadable files simply don't feed the hash
             hasher.update(data: Data(relative.utf8))
             hasher.update(data: data)
