@@ -4,8 +4,13 @@ All notable changes to swift-vigil are documented here.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-11-24
+
 ### Changed
 
+- **swift-crypto `from: "5.1.2"`** (was `from: "3.0.0"`, which kept every dependent off 4.x and 5.x). 5.1.2 is the
+  stack floor (owner, 2026-11-23); resolves to 5.2.0. No source change; 80 tests pass. The `Package.resolved` moves
+  from 3.15.1 to 5.2.0.
 - `PackageFingerprint` acknowledges its file reads with a `// SECURITY:` reason. The paths come
   from enumerating the package's own trees; the next quality gate no longer lets `// SAFETY:`
   answer a security rule.
@@ -161,7 +166,8 @@ All notable changes to swift-vigil are documented here.
 - VigilKit foundation: flip detection, roster store, timing-test scanner, and
   plugin contract v1.
 
-[Unreleased]: https://github.com/jpurnell/swift-vigil/compare/0.7.0...HEAD
+[Unreleased]: https://github.com/jpurnell/swift-vigil/compare/0.10.0...HEAD
+[0.10.0]: https://github.com/jpurnell/swift-vigil/compare/0.9.0...0.10.0
 [0.8.1]: https://github.com/jpurnell/swift-vigil/compare/0.8.0...0.8.1
 [0.8.0]: https://github.com/jpurnell/swift-vigil/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/jpurnell/swift-vigil/compare/0.6.0...0.7.0
